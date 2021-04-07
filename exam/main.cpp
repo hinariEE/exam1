@@ -14,10 +14,11 @@ Thread btnThread;
 EventQueue wave;
 Thread waveThread;
 
-EventQueue ADC;
+EventQueue ADC(32 * EVENTS_EVENT_SIZE);
 Thread ADC_Thread;
 
 int cursor = 0;
+int selected = 0;
 int output = 0;
 
 void cursor_update(int pos, int select)
@@ -55,6 +56,7 @@ void ISR2(){
 
 void ISR3(){
     btn.call(cursor_update, cursor, 1);
+    selected = cursor;
     output = 1;
 }
 
@@ -62,7 +64,7 @@ void genWave(){
     float i = 0.0f;
     float step;
     float high = 3.0f / 3.3f;
-    float slope_list[] = { high / 80.0f * 6.0f / 400.0f,
+    float slope_list[] = { high / 80.0f * 1.125f / 40.0f,
                            high / 40.0f,
                            high / 20.0f,
                            high / 10.0f};
@@ -70,35 +72,33 @@ void genWave(){
     while(1){
         if(i >= high){
             i = high;
-            step = -slope_list[cursor];
-            ThisThread::sleep_for(sleep_list[cursor] * 1ms);
+            step = -slope_list[selected];
+            ThisThread::sleep_for(sleep_list[selected] * 1ms);
         }
         if(i <= 0.0f){
             i = 0.0f;
-            step = slope_list[cursor];
+            step = slope_list[selected];
         }
         i += step;
         Aout = i;
-        ThisThread::sleep_for(1ms / 20);
+        ThisThread::sleep_for(1ms / 200);
     }
 }
 
+int idx = 0;
+int sample = 1024;
+float ADCdata[1024];
 void sampling(){
-    int idx = 0;
-    int sample = 1024;
-    float ADCdata[1024];
-    while(1){
-        ADCdata[idx] = Ain;
-        if(output == 1){
-            idx++;
-            if(idx == sample){
-                output = 0;
-                for(int i = 0; i < sample; i++){
-                    printf("%f\n", ADCdata[i]);
-                }
+    ADCdata[idx] = Ain;
+    if(output == 1){
+        idx++;
+        if(idx == sample){
+            idx = 0;
+            output = 0;
+            for(int i = 0; i < sample; i++){
+                printf("%f\n", ADCdata[i]);
             }
         }
-        ThisThread::sleep_for(480ms / 1024);
     }
 }
 
@@ -128,8 +128,8 @@ int main()
     waveThread.start(callback(&wave, &EventQueue::dispatch_forever));
     wave.call(genWave);
     
-    //ADC_Thread.start(callback(&ADC, &EventQueue::dispatch_forever));
-    //ADC.call(sampling);
+    ADC_Thread.start(callback(&ADC, &EventQueue::dispatch_forever));
+    ADC.call_every(1ms / 2, sampling);
     
     while(1);
 }
