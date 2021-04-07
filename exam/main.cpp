@@ -1,23 +1,17 @@
 #include "mbed.h"
 #include "uLCD_4DGL.h"
 
-DigitalOut led(LED3);
-DigitalOut led1(LED2);
 InterruptIn up(D3);
 InterruptIn down(D6);
 InterruptIn enter(D5);
 uLCD_4DGL uLCD(D1, D0, D2);
+AnalogOut Aout(D7);
 
 EventQueue btn;
 Thread btnThread;
 
-InterruptIn button(USER_BUTTON);
-void flip()
-{
-   led = !led;
-}
-
-
+EventQueue wave;
+Thread waveThread;
 
 int cursor = 0;
 
@@ -61,6 +55,31 @@ void ISR3()
     btn.call(cursor_update, cursor, 1);
 }
 
+void genWave(){
+    float i = 0.0f;
+    float step;
+    float high = 3.0f / 3.3f;
+    float slope_list[] = { high / 80.0f,
+                           high / 40.0f,
+                           high / 20.0f,
+                           high / 10.0f};
+    int sleep_list[] = {80, 160, 200, 220};
+    while(1){
+        if(i >= high){
+            i = high;
+            step = -slope_list[cursor];
+            ThisThread::sleep_for(sleep_list[cursor] * 1ms);
+        }
+        if(i <= 0.0f){
+            i = 0.0f;
+            step = slope_list[cursor];
+        }
+        i += step;
+        Aout = i;
+        ThisThread::sleep_for(1ms);
+    }
+}    
+
 int main()
 {
     uLCD.color(GREEN);
@@ -83,6 +102,9 @@ int main()
     up.rise(ISR1);
     down.rise(ISR2);
     enter.rise(ISR3);
+
+    waveThread.start(callback(&wave, &EventQueue::dispatch_forever));
+    wave.call(genWave);
     
     while(1);
 }
