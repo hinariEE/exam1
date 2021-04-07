@@ -1,11 +1,12 @@
 #include "mbed.h"
 #include "uLCD_4DGL.h"
 
+uLCD_4DGL uLCD(D1, D0, D2);
 InterruptIn up(D3);
 InterruptIn down(D6);
 InterruptIn enter(D5);
-uLCD_4DGL uLCD(D1, D0, D2);
 AnalogOut Aout(D7);
+AnalogIn Ain(A0);
 
 EventQueue btn;
 Thread btnThread;
@@ -13,7 +14,11 @@ Thread btnThread;
 EventQueue wave;
 Thread waveThread;
 
+EventQueue ADC;
+Thread ADC_Thread;
+
 int cursor = 0;
+int output = 0;
 
 void cursor_update(int pos, int select)
 {
@@ -34,32 +39,30 @@ void cursor_update(int pos, int select)
     uLCD.printf("v");
 }
 
-void ISR1()
-{
+void ISR1(){
     if(cursor != 0){
         cursor--;
         btn.call(cursor_update, cursor, 0);
     }
 }
 
-void ISR2()
-{
+void ISR2(){
     if(cursor != 3){
         cursor++;
         btn.call(cursor_update, cursor, 0);
     }
 }
 
-void ISR3()
-{
+void ISR3(){
     btn.call(cursor_update, cursor, 1);
+    output = 1;
 }
 
 void genWave(){
     float i = 0.0f;
     float step;
     float high = 3.0f / 3.3f;
-    float slope_list[] = { high / 80.0f,
+    float slope_list[] = { high / 80.0f * 6.0f / 400.0f,
                            high / 40.0f,
                            high / 20.0f,
                            high / 10.0f};
@@ -76,9 +79,28 @@ void genWave(){
         }
         i += step;
         Aout = i;
-        ThisThread::sleep_for(1ms);
+        ThisThread::sleep_for(1ms / 20);
     }
-}    
+}
+
+void sampling(){
+    int idx = 0;
+    int sample = 1024;
+    float ADCdata[1024];
+    while(1){
+        ADCdata[idx] = Ain;
+        if(output == 1){
+            idx++;
+            if(idx == sample){
+                output = 0;
+                for(int i = 0; i < sample; i++){
+                    printf("%f\n", ADCdata[i]);
+                }
+            }
+        }
+        ThisThread::sleep_for(480ms / 1024);
+    }
+}
 
 int main()
 {
@@ -105,6 +127,9 @@ int main()
 
     waveThread.start(callback(&wave, &EventQueue::dispatch_forever));
     wave.call(genWave);
+    
+    //ADC_Thread.start(callback(&ADC, &EventQueue::dispatch_forever));
+    //ADC.call(sampling);
     
     while(1);
 }
