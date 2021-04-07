@@ -64,11 +64,11 @@ void genWave(){
     float i = 0.0f;
     float step;
     float high = 3.0f / 3.3f;
-    float slope_list[] = { high / 80.0f * 1.125f / 40.0f,
-                           high / 40.0f,
-                           high / 20.0f,
-                           high / 10.0f};
-    int sleep_list[] = {80, 160, 200, 220};
+    float slope_list[] = { high / 80.0f * 0.02142f,
+                           high / 40.0f * 0.02142f,
+                           high / 20.0f * 0.02142f,
+                           high / 10.0f * 0.02142f};
+    int sleep_list[] = {73, 153, 193, 213};
     while(1){
         if(i >= high){
             i = high;
@@ -81,24 +81,27 @@ void genWave(){
         }
         i += step;
         Aout = i;
-        ThisThread::sleep_for(1ms / 200);
+        ThisThread::sleep_for(1ms / 2000);
     }
 }
 
-int idx = 0;
-int sample = 1024;
 float ADCdata[1024];
 void sampling(){
-    ADCdata[idx] = Ain;
-    if(output == 1){
-        idx++;
-        if(idx == sample){
-            idx = 0;
-            output = 0;
-            for(int i = 0; i < sample; i++){
-                printf("%f\n", ADCdata[i]);
+    int idx = 0;
+    int sample = 1024;
+    while(1){
+        ADCdata[idx] = Ain;
+        if(output == 1){
+            idx++;
+            if(idx == sample){
+                idx = 0;
+                output = 0;
+                for(int i = 0; i < sample; i++){
+                    printf("%f\n", ADCdata[i]);
+                }
             }
         }
+        ThisThread::sleep_for(1ms);
     }
 }
 
@@ -129,7 +132,7 @@ int main()
     wave.call(genWave);
     
     ADC_Thread.start(callback(&ADC, &EventQueue::dispatch_forever));
-    ADC.call_every(1ms / 2, sampling);
+    ADC.call(sampling);
     
     while(1);
 }
