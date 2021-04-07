@@ -1,11 +1,23 @@
 #include "mbed.h"
 #include "uLCD_4DGL.h"
 
+DigitalOut led(LED3);
+DigitalOut led1(LED2);
 InterruptIn up(D3);
 InterruptIn down(D6);
 InterruptIn enter(D5);
-
 uLCD_4DGL uLCD(D1, D0, D2);
+
+EventQueue btn;
+Thread btnThread;
+
+InterruptIn button(USER_BUTTON);
+void flip()
+{
+   led = !led;
+}
+
+
 
 int cursor = 0;
 
@@ -32,7 +44,7 @@ void ISR1()
 {
     if(cursor != 0){
         cursor--;
-        cursor_update(cursor, 0);
+        btn.call(cursor_update, cursor, 0);
     }
 }
 
@@ -40,13 +52,13 @@ void ISR2()
 {
     if(cursor != 3){
         cursor++;
-        cursor_update(cursor, 0);
+        btn.call(cursor_update, cursor, 0);
     }
 }
 
 void ISR3()
 {
-    cursor_update(cursor, 1);
+    btn.call(cursor_update, cursor, 1);
 }
 
 int main()
@@ -61,12 +73,16 @@ int main()
     uLCD.printf("1/4");
     uLCD.locate(2, 3);
     uLCD.printf("1/8");
-    
     uLCD.locate(0, 0);
     uLCD.printf("v");
-    up.rise(&ISR1);
-    down.rise(&ISR2);
-    enter.rise(&ISR3);
+
+    btnThread.start(callback(&btn, &EventQueue::dispatch_forever));
+    up.mode(PullNone);
+    down.mode(PullNone);
+    enter.mode(PullNone);
+    up.rise(ISR1);
+    down.rise(ISR2);
+    enter.rise(ISR3);
     
     while(1);
 }
